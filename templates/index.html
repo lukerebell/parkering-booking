@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book plass 44</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>Book plass 44</h1>
+      <div class="intro">
+        <p>Dette er en enkel og uformell løsning for korttidsparkering på min private parkeringsplass.</p>
+        <p>Jeg ser at det er stor etterspørsel etter korttidsparkering, og at mange ikke får svar. Derfor ønsker jeg å gjøre plassen tilgjengelig når den likevel står ledig, i stedet for å leie den ut fast eller selge den.</p>
+        <p>Jeg tar ikke ansvar dersom plassen er opptatt uten at det er registrert booking, og jeg har dessverre ikke kapasitet til å følge opp dette manuelt. Jeg håper derfor alle bruker sunn fornuft og respekterer bookingene som gjøres.</p>
+        <p>Det er dessverre heller ikke mulig å bruke lading på plassen.</p>
+        <p>Du får en bekreftelse direkte på skjermen når du har booket plassen.</p>
+        <p>Hvis du synes løsningen er nyttig, kan du gjerne vippse et valgfritt beløp til 90812444.</p>
+      </div>
+    </header>
+
+    <div id="message" class="message hidden" role="alert"></div>
+
+    <form id="booking-form" novalidate>
+      <label for="name">Navn</label>
+      <input type="text" id="name" name="name" required autocomplete="name" placeholder="Ola Nordmann">
+
+      <label for="phone">Telefonnummer</label>
+      <input type="tel" id="phone" name="phone" required autocomplete="tel" placeholder="91234567">
+
+      <label for="car_reg">Registreringsnummer</label>
+      <input type="text" id="car_reg" name="car_reg" required placeholder="AB12345" maxlength="10">
+
+      <label for="booking_date">Dato</label>
+      <input type="date" id="booking_date" name="booking_date" required>
+
+      <span class="label">Timer <span class="label-hint">(velg én eller flere)</span></span>
+      <div id="hour-options" class="hour-options disabled" role="group" aria-label="Velg timer">
+        <p class="hour-placeholder">Velg dato først</p>
+      </div>
+
+      <button type="submit" id="submit-btn">Book plass 44</button>
+    </form>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
