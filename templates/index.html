@@ -45,23 +45,17 @@
           <span class="range-section-title">Dato</span>
           <div class="range-fields">
             <div class="range-field">
-              <label for="booking_date_from_btn">Fra</label>
+              <label for="booking_date_from">Fra</label>
               <div class="date-input-wrap">
-                <input type="text" id="booking_date_from_display" class="date-display" readonly placeholder="dd.mm.åååå" aria-label="Fra-dato">
-                <button type="button" id="booking_date_from_btn" class="date-picker-btn" aria-label="Åpne kalender for fra-dato">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                </button>
-                <input type="date" id="booking_date_from" name="booking_date_from" class="date-native" required tabindex="-1" aria-hidden="true">
+                <span id="booking_date_from_display" class="date-display is-empty" data-placeholder="dd.mm.åååå" aria-hidden="true"></span>
+                <input type="date" id="booking_date_from" name="booking_date_from" class="date-native" required aria-label="Velg fra-dato">
               </div>
             </div>
             <div class="range-field">
-              <label for="booking_date_to_btn">Til</label>
+              <label for="booking_date_to">Til</label>
               <div class="date-input-wrap">
-                <input type="text" id="booking_date_to_display" class="date-display" readonly placeholder="dd.mm.åååå" aria-label="Til-dato">
-                <button type="button" id="booking_date_to_btn" class="date-picker-btn" aria-label="Åpne kalender for til-dato">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                </button>
-                <input type="date" id="booking_date_to" name="booking_date_to" class="date-native" required tabindex="-1" aria-hidden="true">
+                <span id="booking_date_to_display" class="date-display is-empty" data-placeholder="dd.mm.åååå" aria-hidden="true"></span>
+                <input type="date" id="booking_date_to" name="booking_date_to" class="date-native" required aria-label="Velg til-dato">
               </div>
             </div>
           </div>

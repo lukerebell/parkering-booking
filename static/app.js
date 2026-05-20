@@ -3,8 +3,6 @@ const dateFromInput = document.getElementById("booking_date_from");
 const dateToInput = document.getElementById("booking_date_to");
 const dateFromDisplay = document.getElementById("booking_date_from_display");
 const dateToDisplay = document.getElementById("booking_date_to_display");
-const dateFromBtn = document.getElementById("booking_date_from_btn");
-const dateToBtn = document.getElementById("booking_date_to_btn");
 const hourFromSelect = document.getElementById("hour_from");
 const hourToSelect = document.getElementById("hour_to");
 const periodNotice = document.getElementById("period-notice");
@@ -23,8 +21,14 @@ function setMinDate() {
   dateToInput.min = min;
 }
 
-function syncDateDisplay(nativeInput, displayInput) {
-  displayInput.value = nativeInput.value ? formatDateNorwegian(nativeInput.value) : "";
+function syncDateDisplay(nativeInput, displayEl) {
+  if (nativeInput.value) {
+    displayEl.textContent = formatDateNorwegian(nativeInput.value);
+    displayEl.classList.remove("is-empty");
+  } else {
+    displayEl.textContent = "";
+    displayEl.classList.add("is-empty");
+  }
 }
 
 function syncAllDateDisplays() {
@@ -32,35 +36,18 @@ function syncAllDateDisplays() {
   syncDateDisplay(dateToInput, dateToDisplay);
 }
 
-function openDatePicker(nativeInput) {
-  if (typeof nativeInput.showPicker === "function") {
-    try {
-      nativeInput.showPicker();
-      return;
-    } catch {
-      /* fall through */
-    }
-  }
-  nativeInput.focus();
-  nativeInput.click();
-}
-
 function initDatePickers() {
   const pairs = [
-    [dateFromInput, dateFromDisplay, dateFromBtn],
-    [dateToInput, dateToDisplay, dateToBtn],
+    [dateFromInput, dateFromDisplay],
+    [dateToInput, dateToDisplay],
   ];
 
-  for (const [nativeInput, displayInput, pickerBtn] of pairs) {
-    const open = () => openDatePicker(nativeInput);
-
-    pickerBtn.addEventListener("click", open);
-    displayInput.addEventListener("click", open);
+  for (const [nativeInput, displayEl] of pairs) {
     nativeInput.addEventListener("change", () => {
-      syncDateDisplay(nativeInput, displayInput);
+      syncDateDisplay(nativeInput, displayEl);
       onDateChange();
     });
-    nativeInput.addEventListener("input", () => syncDateDisplay(nativeInput, displayInput));
+    nativeInput.addEventListener("input", () => syncDateDisplay(nativeInput, displayEl));
   }
 
   syncAllDateDisplays();
