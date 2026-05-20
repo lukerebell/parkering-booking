@@ -15,7 +15,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-DATABASE = Path(__file__).parent / "bookings.db"
+def database_path() -> Path:
+    configured = os.environ.get("DATABASE_PATH", "").strip()
+    if configured:
+        return Path(configured)
+    return Path(__file__).parent / "bookings.db"
+
+
+DATABASE = database_path()
 ALL_HOURS = [f"{h:02d}" for h in range(24)]
 MAX_BOOKING_HOURS = 96
 LETTER_RE = re.compile(r"[a-zA-ZæøåÆØÅ]", re.UNICODE)
@@ -318,6 +325,7 @@ def conflicts_to_message(conflicts: list[dict[str, str]]) -> str:
 
 
 def init_db():
+    DATABASE.parent.mkdir(parents=True, exist_ok=True)
     with get_db() as conn:
         conn.execute(
             """
