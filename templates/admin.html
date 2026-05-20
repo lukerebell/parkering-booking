@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin – Plass 44</title>
+  <link rel="stylesheet" href="/static/style.css?v=2">
+</head>
+<body>
+  <main class="container admin-page">
+    <header class="admin-header">
+      <h1>Admin – bookinger</h1>
+      <p><a href="/">← Tilbake til booking</a></p>
+    </header>
+
+    {% if not admin_enabled %}
+      <p class="admin-notice">Admin er ikke aktivert. Sett miljøvariabelen <code>ADMIN_PASSWORD</code> på Render (eller lokalt) og start appen på nytt.</p>
+    {% elif not logged_in %}
+      <form method="post" action="/admin/login" class="admin-login">
+        <label for="password">Passord</label>
+        <input type="password" id="password" name="password" required autocomplete="current-password">
+        {% if error %}
+          <p class="admin-error" role="alert">{{ error }}</p>
+        {% endif %}
+        <button type="submit">Logg inn</button>
+      </form>
+    {% else %}
+      <div class="admin-toolbar">
+        <p class="admin-summary">{{ groups|length }} booking(er), {{ slot_count }} time(r) totalt</p>
+        <form method="post" action="/admin/logout">
+          <button type="submit" class="admin-btn-secondary">Logg ut</button>
+        </form>
+      </div>
+
+      {% if message %}
+        <p class="admin-message" role="status">{{ message }}</p>
+      {% endif %}
+
+      {% if groups %}
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Navn</th>
+                <th>Telefon</th>
+                <th>Reg.nr</th>
+                <th>Periode</th>
+                <th>Timer</th>
+                <th>Opprettet</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for group in groups %}
+              <tr>
+                <td>{{ group.name }}</td>
+                <td>{{ group.phone }}</td>
+                <td>{{ group.car_reg }}</td>
+                <td>{{ group.period_label }}</td>
+                <td>{{ group.slot_count }}</td>
+                <td>{{ group.created_at }}</td>
+                <td>
+                  <form method="post" action="/admin/delete" onsubmit="return confirm('Slette denne bookingen?');">
+                    <input type="hidden" name="ids" value="{{ group.ids }}">
+                    <button type="submit" class="admin-btn-danger">Slett</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="admin-empty">Ingen bookinger ennå.</p>
+      {% endif %}
+    {% endif %}
+  </main>
+</body>
+</html>

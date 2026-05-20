@@ -1,12 +1,16 @@
+import hashlib
+import hmac
+import os
 import re
+import secrets
 import sqlite3
 from contextlib import contextmanager
 from datetime import date, timedelta
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -16,6 +20,8 @@ ALL_HOURS = [f"{h:02d}" for h in range(24)]
 MAX_BOOKING_HOURS = 96
 LETTER_RE = re.compile(r"[a-zA-ZæøåÆØÅ]", re.UNICODE)
 CAR_REG_RE = re.compile(r"^[A-ZÆØÅ]{2}\d{5}$", re.UNICODE)
+ADMIN_COOKIE = "admin_session"
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 
 
 def letter_count(value: str) -> int:
@@ -116,6 +122,98 @@ def normalize_hour(hour: str) -> str:
 def format_date_norwegian(iso_date: str) -> str:
     d = date.fromisoformat(iso_date)
     return d.strftime("%d.%m.%Y")
+
+
+def admin_session_token() -> str:
+    secret = os.environ.get("ADMIN_SECRET", ADMIN_PASSWORD or "change-me").encode()
+    return hmac.new(secret, b"parkering-admin", hashlib.sha256).hexdigest()
+
+
+def is_admin_authenticated(request: Request) -> bool:
+    if not ADMIN_PASSWORD:
+        return False
+    token = request.cookies.get(ADMIN_COOKIE)
+    expected = admin_session_token()
+    return token is not None and secrets.compare_digest(token, expected)
+
+
+def slot_after(date_str: str, hour_str: str) -> tuple[str, str]:
+    hour = int(hour_str)
+    current = date.fromisoformat(date_str)
+    if hour < 23:
+        return date_str, f"{hour + 1:02d}"
+    return (current + timedelta(days=1)).isoformat(), "00"
+
+
+def slots_are_consecutive(
+    prev: tuple[str, str], nxt: tuple[str, str]
+) -> bool:
+    return slot_after(prev[0], prev[1]) == nxt
+
+
+def finalize_booking_group(group: dict) -> dict:
+    end_date, end_hour = slot_after(group["last_slot"][0], group["last_slot"][1])
+    return {
+        "name": group["name"],
+        "phone": group["phone"],
+        "car_reg": group["car_reg"],
+        "ids": ",".join(str(booking_id) for booking_id in group["ids"]),
+        "slot_count": group["slot_count"],
+        "created_at": group["created_at"],
+        "period_label": format_period_label(
+            group["first_slot"][0],
+            group["first_slot"][1],
+            end_date,
+            end_hour,
+        ),
+    }
+
+
+def list_booking_groups(conn) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT id, name, phone, car_reg, booking_date, booking_hour, created_at
+        FROM bookings
+        ORDER BY created_at DESC, name, booking_date, booking_hour
+        """
+    ).fetchall()
+
+    groups: list[dict] = []
+    current: dict | None = None
+
+    for row in rows:
+        identity = (row["name"], row["phone"], row["car_reg"])
+        slot = (row["booking_date"], normalize_hour(row["booking_hour"]))
+
+        if (
+            current
+            and current["identity"] == identity
+            and slots_are_consecutive(current["last_slot"], slot)
+        ):
+            current["ids"].append(row["id"])
+            current["last_slot"] = slot
+            current["slot_count"] += 1
+            continue
+
+        if current:
+            groups.append(finalize_booking_group(current))
+
+        current = {
+            "identity": identity,
+            "name": row["name"],
+            "phone": row["phone"],
+            "car_reg": row["car_reg"],
+            "ids": [row["id"]],
+            "first_slot": slot,
+            "last_slot": slot,
+            "slot_count": 1,
+            "created_at": row["created_at"],
+        }
+
+    if current:
+        groups.append(finalize_booking_group(current))
+
+    return groups
 
 
 def format_period_label(date_from: str, hour_from: str, date_to: str, hour_to: str) -> str:
@@ -254,6 +352,100 @@ def startup():
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+def admin_template_context(request: Request, **extra):
+    return {
+        "request": request,
+        "admin_enabled": bool(ADMIN_PASSWORD),
+        "logged_in": is_admin_authenticated(request),
+        **extra,
+    }
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_page(request: Request, message: str | None = None):
+    if not ADMIN_PASSWORD:
+        return templates.TemplateResponse(
+            "admin.html",
+            admin_template_context(request),
+        )
+
+    if not is_admin_authenticated(request):
+        return templates.TemplateResponse(
+            "admin.html",
+            admin_template_context(request, error=None),
+        )
+
+    with get_db() as conn:
+        groups = list_booking_groups(conn)
+
+    slot_count = sum(group["slot_count"] for group in groups)
+    return templates.TemplateResponse(
+        "admin.html",
+        admin_template_context(
+            request,
+            groups=groups,
+            slot_count=slot_count,
+            message=message,
+        ),
+    )
+
+
+@app.post("/admin/login")
+async def admin_login(request: Request, password: str = Form(...)):
+    if not ADMIN_PASSWORD:
+        raise HTTPException(status_code=503, detail="ADMIN_PASSWORD er ikke satt.")
+
+    if not secrets.compare_digest(password, ADMIN_PASSWORD):
+        return templates.TemplateResponse(
+            "admin.html",
+            admin_template_context(request, error="Feil passord."),
+            status_code=401,
+        )
+
+    response = RedirectResponse(url="/admin", status_code=303)
+    response.set_cookie(
+        ADMIN_COOKIE,
+        admin_session_token(),
+        httponly=True,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 7,
+        secure=request.url.scheme == "https",
+    )
+    return response
+
+
+@app.post("/admin/logout")
+async def admin_logout():
+    response = RedirectResponse(url="/admin", status_code=303)
+    response.delete_cookie(ADMIN_COOKIE)
+    return response
+
+
+@app.post("/admin/delete")
+async def admin_delete(request: Request, ids: str = Form(...)):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+
+    booking_ids: list[int] = []
+    for part in ids.split(","):
+        part = part.strip()
+        if part.isdigit():
+            booking_ids.append(int(part))
+
+    if not booking_ids:
+        return RedirectResponse(url="/admin?message=Ingen+rader+valgt", status_code=303)
+
+    placeholders = ",".join("?" for _ in booking_ids)
+    with get_db() as conn:
+        conn.execute(
+            f"DELETE FROM bookings WHERE id IN ({placeholders})",
+            booking_ids,
+        )
+        conn.commit()
+
+    return RedirectResponse(url="/admin?message=Booking+slettet", status_code=303)
 
 
 @app.get("/available-times")

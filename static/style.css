@@ -342,3 +342,130 @@ select {
     padding-top: 3rem;
   }
 }
+
+.admin-page h1 {
+  font-size: 1.25rem;
+}
+
+.admin-header p {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+}
+
+.admin-header a {
+  color: #666;
+}
+
+.admin-notice,
+.admin-empty {
+  font-size: 0.875rem;
+  color: #666;
+  line-height: 1.5;
+}
+
+.admin-notice code {
+  font-size: 0.8125rem;
+  background: #f0f0f0;
+  padding: 0.1rem 0.35rem;
+}
+
+.admin-login {
+  max-width: 280px;
+}
+
+.admin-login label {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.admin-login input {
+  margin-bottom: 1rem;
+}
+
+.admin-login button,
+.admin-btn-secondary,
+.admin-btn-danger {
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  border-radius: 4px;
+  cursor: pointer;
+  border: none;
+}
+
+.admin-login button {
+  background: #111;
+  color: #fff;
+}
+
+.admin-error {
+  margin: -0.5rem 0 1rem;
+  color: #8b2e2e;
+  font-size: 0.875rem;
+}
+
+.admin-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.admin-summary {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.admin-btn-secondary {
+  background: #eee;
+  color: #111;
+}
+
+.admin-message {
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  background: #f0f7f2;
+  border-left: 2px solid #1a5c2e;
+  font-size: 0.875rem;
+  color: #1a5c2e;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 0.65rem 0.5rem;
+  border-bottom: 1px solid #e5e5e5;
+  vertical-align: top;
+}
+
+.admin-table th {
+  font-weight: 600;
+  color: #444;
+}
+
+.admin-table td form {
+  margin: 0;
+}
+
+.admin-btn-danger {
+  background: #fff;
+  color: #8b2e2e;
+  border: 1px solid #e8d0d0;
+  padding: 0.35rem 0.65rem;
+}
+
+.admin-btn-danger:hover {
+  background: #fce8e6;
+}
