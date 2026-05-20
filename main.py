@@ -29,6 +29,7 @@ LETTER_RE = re.compile(r"[a-zA-ZæøåÆØÅ]", re.UNICODE)
 CAR_REG_RE = re.compile(r"^[A-ZÆØÅ]{2}\d{5}$", re.UNICODE)
 ADMIN_COOKIE = "admin_session"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+ASSET_VERSION = os.environ.get("APP_ASSET_VERSION", "3")
 
 
 def letter_count(value: str) -> int:
@@ -42,6 +43,24 @@ def phone_digits(value: str) -> str:
 app = FastAPI(title="Parkering Booking")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+
+@app.middleware("http")
+async def cache_control_middleware(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+
+    if path in {"/", "/admin"} or path.startswith("/admin/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    elif path.startswith("/static"):
+        if request.query_params.get("v"):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            response.headers["Cache-Control"] = "no-cache"
+
+    return response
 
 
 @app.exception_handler(RequestValidationError)
@@ -359,12 +378,16 @@ def startup():
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "asset_version": ASSET_VERSION},
+    )
 
 
 def admin_template_context(request: Request, **extra):
     return {
         "request": request,
+        "asset_version": ASSET_VERSION,
         "admin_enabled": bool(ADMIN_PASSWORD),
         "logged_in": is_admin_authenticated(request),
         **extra,
