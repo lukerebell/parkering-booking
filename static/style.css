@@ -38,6 +38,19 @@ h1 {
   line-height: 1.6;
 }
 
+.intro-heading {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111;
+}
+
+.intro-divider {
+  margin: 1.25rem 0;
+  border: none;
+  border-top: 1px solid #e5e5e5;
+}
+
 .intro p {
   margin: 0 0 0.65rem;
 }
