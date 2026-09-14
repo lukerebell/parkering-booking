@@ -59,6 +59,10 @@ h1 {
   margin-bottom: 0;
 }
 
+.intro-signoff {
+  margin-top: 1rem;
+}
+
 .message {
   padding: 0.75rem 0;
   margin-top: 1.5rem;
