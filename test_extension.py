@@ -22,7 +22,10 @@ from main import (
     intervals_overlap,
     interval_key,
     is_reservation_active,
+    list_booking_groups,
     migrate_hourly_bookings_to_reservations,
+    reservation_is_fully_paid,
+    set_reservation_paid_status,
     table_exists,
     validate_migrated_reservations,
 )
@@ -715,6 +718,216 @@ class MigrationTests(unittest.TestCase):
                 )
             with self.assertRaises(MigrationError):
                 validate_migrated_reservations(conn)
+
+
+class AdminPaidStatusTests(unittest.TestCase):
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = Path(self._tmpdir.name) / "test.db"
+        self._old_db = main.DATABASE
+        self._old_password = main.ADMIN_PASSWORD
+        main.DATABASE = self.db_path
+        main.ADMIN_PASSWORD = "test-admin-secret"
+        init_db()
+
+    def tearDown(self):
+        main.DATABASE = self._old_db
+        main.ADMIN_PASSWORD = self._old_password
+        self._tmpdir.cleanup()
+
+    def _future_range_18h(self):
+        start_day = (datetime.now(TZ_OSLO) + timedelta(days=1)).date()
+        end_day = start_day + timedelta(days=1)
+        return start_day.isoformat(), "08", end_day.isoformat(), "02"
+
+    def _insert(self, price=50, paid=0):
+        start, start_h, end, end_h = self._future_range_18h()
+        with get_db() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO reservations (
+                    manage_token, name, phone, car_reg,
+                    start_date, start_hour, end_date, end_hour,
+                    charged_total_kr, paid_total_kr,
+                    is_legacy, original_end_date, original_end_hour
+                ) VALUES ('paid-token', 'Ada', '12345678', 'KJ12345', ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                """,
+                (start, start_h, end, end_h, price, paid, end, end_h),
+            )
+            rid = cur.lastrowid
+            conn.execute(
+                """
+                INSERT INTO price_charges (
+                    reservation_id, amount_kr, total_price_kr, charged_total_after_kr,
+                    kind, end_date, end_hour
+                ) VALUES (?, ?, ?, ?, 'initial', ?, ?)
+                """,
+                (rid, price, price, price, end, end_h),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT * FROM reservations WHERE id = ?", (rid,)
+            ).fetchone()
+            return row, end
+
+    def test_mark_paid_sets_paid_equal_to_charged(self):
+        reservation, _ = self._insert(50, 0)
+        with get_db() as conn:
+            ok = set_reservation_paid_status(conn, reservation["id"], True)
+            conn.commit()
+            self.assertTrue(ok)
+            refreshed = conn.execute(
+                "SELECT * FROM reservations WHERE id = ?", (reservation["id"],)
+            ).fetchone()
+            self.assertEqual(refreshed["paid_total_kr"], 50)
+            self.assertTrue(reservation_is_fully_paid(refreshed))
+            groups = list_booking_groups(conn)
+            self.assertTrue(groups[0]["is_paid"])
+            self.assertEqual(groups[0]["price_kr"], 50)
+
+    def test_unmark_paid_resets_to_zero(self):
+        reservation, _ = self._insert(50, 50)
+        with get_db() as conn:
+            set_reservation_paid_status(conn, reservation["id"], False)
+            conn.commit()
+            refreshed = conn.execute(
+                "SELECT * FROM reservations WHERE id = ?", (reservation["id"],)
+            ).fetchone()
+            self.assertEqual(refreshed["paid_total_kr"], 0)
+            self.assertFalse(reservation_is_fully_paid(refreshed))
+
+    def test_paid_status_persists_after_reload(self):
+        reservation, _ = self._insert(50, 0)
+        with get_db() as conn:
+            set_reservation_paid_status(conn, reservation["id"], True)
+            conn.commit()
+        with get_db() as conn:
+            groups = list_booking_groups(conn)
+            self.assertEqual(len(groups), 1)
+            self.assertTrue(groups[0]["is_paid"])
+            self.assertEqual(groups[0]["paid_total_kr"], 50)
+
+    def test_extension_keeps_paid_and_unchecks_when_price_rises(self):
+        reservation, end = self._insert(50, 0)
+        with get_db() as conn:
+            set_reservation_paid_status(conn, reservation["id"], True)
+            conn.commit()
+            paid_row = conn.execute(
+                "SELECT * FROM reservations WHERE id = ?", (reservation["id"],)
+            ).fetchone()
+            self.assertEqual(paid_row["paid_total_kr"], 50)
+            self.assertTrue(reservation_is_fully_paid(paid_row))
+
+            result = apply_extension(conn, paid_row, end, "10")
+            conn.commit()
+            self.assertTrue(result["extended"])
+            refreshed = conn.execute(
+                "SELECT * FROM reservations WHERE id = ?", (reservation["id"],)
+            ).fetchone()
+            self.assertEqual(refreshed["charged_total_kr"], 100)
+            self.assertEqual(refreshed["paid_total_kr"], 50)
+            self.assertFalse(reservation_is_fully_paid(refreshed))
+
+            set_reservation_paid_status(conn, reservation["id"], True)
+            conn.commit()
+            final = conn.execute(
+                "SELECT * FROM reservations WHERE id = ?", (reservation["id"],)
+            ).fetchone()
+            self.assertEqual(final["paid_total_kr"], 100)
+            self.assertTrue(reservation_is_fully_paid(final))
+
+    def test_only_admin_can_change_paid_status_via_endpoint(self):
+        from fastapi.testclient import TestClient
+
+        reservation, _ = self._insert(50, 0)
+        client = TestClient(main.app)
+
+        denied = client.post(
+            "/admin/paid",
+            data={"reservation_id": str(reservation["id"]), "paid": "1"},
+            follow_redirects=False,
+        )
+        self.assertEqual(denied.status_code, 303)
+        self.assertEqual(denied.headers["location"], "/admin")
+
+        with get_db() as conn:
+            still = conn.execute(
+                "SELECT paid_total_kr FROM reservations WHERE id = ?",
+                (reservation["id"],),
+            ).fetchone()
+            self.assertEqual(still["paid_total_kr"], 0)
+
+        login = client.post(
+            "/admin/login",
+            data={"password": "test-admin-secret"},
+            follow_redirects=False,
+        )
+        self.assertEqual(login.status_code, 303)
+        self.assertIn("admin_session", login.cookies)
+
+        allowed = client.post(
+            "/admin/paid",
+            data={"reservation_id": str(reservation["id"]), "paid": "1"},
+            cookies=login.cookies,
+            follow_redirects=False,
+        )
+        self.assertEqual(allowed.status_code, 303)
+        self.assertIn("Betaling+registrert", allowed.headers["location"])
+
+        with get_db() as conn:
+            refreshed = conn.execute(
+                "SELECT paid_total_kr FROM reservations WHERE id = ?",
+                (reservation["id"],),
+            ).fetchone()
+            self.assertEqual(refreshed["paid_total_kr"], 50)
+
+        unchecked = client.post(
+            "/admin/paid",
+            data={"reservation_id": str(reservation["id"]), "paid": "0"},
+            cookies=login.cookies,
+            follow_redirects=False,
+        )
+        self.assertEqual(unchecked.status_code, 303)
+        with get_db() as conn:
+            cleared = conn.execute(
+                "SELECT paid_total_kr FROM reservations WHERE id = ?",
+                (reservation["id"],),
+            ).fetchone()
+            self.assertEqual(cleared["paid_total_kr"], 0)
+
+    def test_admin_page_shows_paid_status_labels(self):
+        from fastapi.testclient import TestClient
+
+        unpaid, _ = self._insert(50, 0)
+        with get_db() as conn:
+            conn.execute(
+                """
+                INSERT INTO reservations (
+                    manage_token, name, phone, car_reg,
+                    start_date, start_hour, end_date, end_hour,
+                    charged_total_kr, paid_total_kr,
+                    is_legacy, original_end_date, original_end_hour
+                ) VALUES (
+                    'paid-label-token', 'Bo', '87654321', 'XY98765',
+                    ?, '10', ?, '18', 100, 100, 0, ?, '18'
+                )
+                """,
+                (unpaid["start_date"], unpaid["end_date"], unpaid["end_date"]),
+            )
+            conn.commit()
+
+        client = TestClient(main.app)
+        login = client.post(
+            "/admin/login",
+            data={"password": "test-admin-secret"},
+            follow_redirects=False,
+        )
+        page = client.get("/admin", cookies=login.cookies)
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("Ikke betalt", page.text)
+        self.assertIn(">Betalt<", page.text)
+        self.assertIn("admin-paid-toggle is-paid", page.text)
+        self.assertIn("admin-paid-toggle is-unpaid", page.text)
 
 
 if __name__ == "__main__":

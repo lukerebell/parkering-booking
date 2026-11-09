@@ -49,7 +49,7 @@
                 <th>Reg.nr</th>
                 <th>Periode</th>
                 <th>Timer</th>
-                <th>Belastet</th>
+                <th>Pris</th>
                 <th>Betalt</th>
                 <th>Opprettet</th>
                 <th></th>
@@ -64,7 +64,24 @@
                 <td>{{ group.period_label }}</td>
                 <td>{{ group.slot_count }}</td>
                 <td>{% if group.price_kr is not none %}{{ group.price_kr }} kr{% else %}–{% endif %}</td>
-                <td>{% if group.paid_total_kr is not none %}{{ group.paid_total_kr }} kr{% else %}0 kr{% endif %}</td>
+                <td class="admin-paid-cell">
+                  <form method="post" action="/admin/paid" class="admin-paid-form">
+                    <input type="hidden" name="reservation_id" value="{{ group.reservation_id }}">
+                    <input type="hidden" name="paid" value="0">
+                    <label class="admin-paid-toggle {% if group.is_paid %}is-paid{% else %}is-unpaid{% endif %}">
+                      <input
+                        type="checkbox"
+                        class="admin-paid-checkbox"
+                        {% if group.is_paid %}checked{% endif %}
+                        onchange="this.form.paid.value = this.checked ? '1' : '0'; this.form.submit();"
+                      >
+                      <span class="admin-paid-mark" aria-hidden="true"></span>
+                      <span class="admin-paid-text">
+                        {% if group.is_paid %}Betalt{% else %}Ikke betalt{% endif %}
+                      </span>
+                    </label>
+                  </form>
+                </td>
                 <td>{{ group.created_at }}</td>
                 <td>
                   <form method="post" action="/admin/delete" onsubmit="return confirm('Slette denne bookingen?');">

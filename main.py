@@ -30,7 +30,7 @@ LETTER_RE = re.compile(r"[a-zA-ZæøåÆØÅ]", re.UNICODE)
 CAR_REG_RE = re.compile(r"^[A-ZÆØÅ]{2}\d{5}$", re.UNICODE)
 ADMIN_COOKIE = "admin_session"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
-ASSET_VERSION = os.environ.get("APP_ASSET_VERSION", "12")
+ASSET_VERSION = os.environ.get("APP_ASSET_VERSION", "14")
 TZ_OSLO = ZoneInfo("Europe/Oslo")
 
 PRICE_PER_DAY = 50
@@ -342,6 +342,33 @@ def is_admin_authenticated(request: Request) -> bool:
     return token is not None and secrets.compare_digest(token, expected)
 
 
+def reservation_is_fully_paid(reservation) -> bool:
+    """Avkrysset når hele totalprisen er registrert mottatt."""
+    charged = int(reservation["charged_total_kr"] or 0)
+    paid = int(reservation["paid_total_kr"] or 0)
+    return charged > 0 and paid >= charged
+
+
+def set_reservation_paid_status(conn, reservation_id: int, mark_paid: bool) -> bool:
+    """
+    Marker hele charged_total_kr som betalt, eller nullstill paid_total_kr.
+    Returnerer False hvis reservasjonen ikke finnes.
+    """
+    row = conn.execute(
+        "SELECT id, charged_total_kr FROM reservations WHERE id = ?",
+        (reservation_id,),
+    ).fetchone()
+    if not row:
+        return False
+    charged = int(row["charged_total_kr"] or 0)
+    new_paid = charged if mark_paid else 0
+    conn.execute(
+        "UPDATE reservations SET paid_total_kr = ? WHERE id = ?",
+        (new_paid, reservation_id),
+    )
+    return True
+
+
 def slot_after(date_str: str, hour_str: str) -> tuple[str, str]:
     hour = int(hour_str)
     current = date.fromisoformat(date_str)
@@ -523,6 +550,7 @@ def list_booking_groups(conn) -> list[dict]:
                 "slot_count": hours,
                 "price_kr": row["charged_total_kr"],
                 "paid_total_kr": row["paid_total_kr"],
+                "is_paid": reservation_is_fully_paid(row),
                 "created_at": row["created_at"],
                 "period_label": format_period_label(
                     row["start_date"],
@@ -1293,6 +1321,32 @@ async def admin_delete(request: Request, reservation_id: str = Form("")):
         conn.commit()
 
     return RedirectResponse(url="/admin?message=Booking+slettet", status_code=303)
+
+
+@app.post("/admin/paid")
+async def admin_set_paid(
+    request: Request,
+    reservation_id: str = Form(""),
+    paid: str = Form("0"),
+):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+
+    if not reservation_id.strip().isdigit():
+        return RedirectResponse(url="/admin?message=Ingen+rader+valgt", status_code=303)
+
+    rid = int(reservation_id.strip())
+    mark_paid = paid.strip().lower() in {"1", "true", "on", "yes"}
+    with get_db() as conn:
+        updated = set_reservation_paid_status(conn, rid, mark_paid)
+        if not updated:
+            return RedirectResponse(
+                url="/admin?message=Fant+ikke+bookingen", status_code=303
+            )
+        conn.commit()
+
+    message = "Betaling+registrert" if mark_paid else "Betaling+fjernet"
+    return RedirectResponse(url=f"/admin?message={message}", status_code=303)
 
 
 @app.get("/available-times")
