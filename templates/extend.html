@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Forleng parkering – Plass 44</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>Forleng parkering</h1>
+      <p class="admin-summary"><a href="/">← Til ny booking</a></p>
+    </header>
+
+    {% if error %}
+      <div class="message error" role="alert">{{ error }}</div>
+    {% elif reservation %}
+      <section class="extend-current">
+        <h2 class="intro-heading">Din booking</h2>
+        <ul class="confirmation-details">
+          <li><span>Navn</span> {{ reservation.name }}</li>
+          <li><span>Telefon</span> {{ reservation.phone }}</li>
+          <li><span>Reg.nr</span> {{ reservation.car_reg }}</li>
+          <li><span>Periode</span> {{ reservation.period_label }}</li>
+          <li><span>Belastet</span> {{ reservation.charged_total_kr }} kr</li>
+        </ul>
+      </section>
+
+      {% if not reservation.active %}
+        <div class="message error" role="status">
+          Parkeringen er utløpt. Opprett en <a href="/">ny booking</a> for å parkere igjen.
+        </div>
+      {% else %}
+        <form id="extend-form" novalidate>
+          <input type="hidden" id="manage-token" value="{{ token }}">
+
+          <div class="range-picker">
+            <div class="range-section">
+              <span class="range-section-title">Nytt sluttidspunkt</span>
+              <div class="range-fields">
+                <div class="range-field">
+                  <label for="end_date">Til dato</label>
+                  <div class="date-input-wrap">
+                    <span id="end_date_display" class="date-display is-empty" data-placeholder="dd.mm.åååå" aria-hidden="true"></span>
+                    <input type="date" id="end_date" class="date-native" required
+                           min="{{ reservation.end_date }}"
+                           value="{{ reservation.end_date }}"
+                           aria-label="Velg ny til-dato">
+                  </div>
+                </div>
+                <div class="range-field">
+                  <label for="end_hour">Til klokkeslett</label>
+                  <select id="end_hour" required></select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="extend-quote" class="price-summary hidden" aria-live="polite"></div>
+
+          <button type="submit" id="extend-btn" disabled>Forleng parkering</button>
+        </form>
+
+        <div id="extend-message" class="message hidden" role="alert" aria-live="polite"></div>
+      {% endif %}
+    {% endif %}
+  </main>
+
+  {% if reservation and reservation.active %}
+  <script>
+    window.EXTEND_BOOT = {
+      token: {{ token|tojson }},
+      endDate: {{ reservation.end_date|tojson }},
+      endHour: {{ reservation.end_hour|tojson }},
+      vipps: {{ reservation.vipps_number|tojson }}
+    };
+  </script>
+  <script src="/static/extend.js?v={{ asset_version }}"></script>
+  {% endif %}
+</body>
+</html>

@@ -49,6 +49,8 @@
                 <th>Reg.nr</th>
                 <th>Periode</th>
                 <th>Timer</th>
+                <th>Belastet</th>
+                <th>Betalt</th>
                 <th>Opprettet</th>
                 <th></th>
               </tr>
@@ -61,10 +63,12 @@
                 <td>{{ group.car_reg }}</td>
                 <td>{{ group.period_label }}</td>
                 <td>{{ group.slot_count }}</td>
+                <td>{% if group.price_kr is not none %}{{ group.price_kr }} kr{% else %}–{% endif %}</td>
+                <td>{% if group.paid_total_kr is not none %}{{ group.paid_total_kr }} kr{% else %}0 kr{% endif %}</td>
                 <td>{{ group.created_at }}</td>
                 <td>
                   <form method="post" action="/admin/delete" onsubmit="return confirm('Slette denne bookingen?');">
-                    <input type="hidden" name="ids" value="{{ group.ids }}">
+                    <input type="hidden" name="reservation_id" value="{{ group.reservation_id }}">
                     <button type="submit" class="admin-btn-danger">Slett</button>
                   </form>
                 </td>

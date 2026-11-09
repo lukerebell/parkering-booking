@@ -3,4 +3,9 @@ __pycache__/
 .venv/
 venv/
 bookings.db
+*.db
+*.db-wal
+*.db-shm
+*.sqbpro
 .env
+data/test/

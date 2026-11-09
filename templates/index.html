@@ -15,14 +15,19 @@
       <h1>Book plass 44</h1>
       <div class="intro">
         <h2 class="intro-heading">Viktig informasjon før du booker</h2>
-        <p>Dette er en enkel og uformell løsning for korttidsparkering på min private parkeringsplass.</p>
-        <p>Det har vært mange som har brukt plassen siden jeg gjorde den tilgjengelig, så det er tydelig at det er behov for korttidsparkering 😊</p>
-        <p>Målet mitt er ikke å tjene penger på dette, men å tilby et lite tilbud til fellesskapet når plassen min likevel står ledig.</p>
-        <p>Det koster meg samtidig penger å holde bookingløsningen i drift, og per i dag er kostnadene mine høyere enn det som kommer inn. Hvis det fortsetter slik, kommer jeg etter hvert til å ta ned løsningen.</p>
-        <p>Hvis du bruker plassen og ønsker at løsningen skal fortsette, setter jeg derfor stor pris på et frivillig bidrag på Vipps: <strong>90812444</strong>.</p>
-        <p>Så langt har alle respektert bookingtidene, og løsningen har fungert sømløst slik at neste person kommer til en ledig plass. Jeg håper det fortsetter slik 😊</p>
-        <p>Du får en bekreftelse direkte på skjermen når du har booket plassen. Ta gjerne et skjermbilde av bekreftelsen, så har du bookingtiden tilgjengelig.</p>
-        <p>Ved booking lagres navn, telefonnummer og registreringsnummer for å administrere bookingen. Opplysningene deles ikke med andre og slettes fortløpende etter gjennomført booking.</p>
+        <p>Her kan du leie min private parkeringsplass, enten for korttids- eller langtidsparkering 😊</p>
+        <p><strong>Priser:</strong></p>
+        <ul class="intro-list">
+          <li>50 kr per døgn</li>
+          <li>300 kr per uke</li>
+          <li>1 000 kr per måned (30 døgn)</li>
+        </ul>
+        <p>Du betaler alltid den rimeligste kombinasjonen for perioden du booker. Betaling skjer med Vipps til <strong>908 12 444</strong>.</p>
+        <p><strong>Administrering og forlengelse</strong></p>
+        <p>Når du booker, får du en personlig lenke hvor du kan se og forlenge parkeringen din 😊</p>
+        <p><strong>Husk å kopiere og lagre lenken!</strong> Da kan du enkelt forlenge parkeringen ved behov, uten å opprette en ny booking.</p>
+        <p>Forlengelse må gjøres før parkeringstiden utløper, og forutsetter at plassen fortsatt er ledig. Husk derfor å respektere bookingtidene, slik at neste person ikke kommer til en opptatt parkeringsplass 😊</p>
+        <p>Ved booking lagres navn, telefonnummer og registreringsnummer for å administrere parkeringen.</p>
         <p class="intro-signoff">Mvh<br>Haakon</p>
       </div>
     </header>
@@ -85,7 +90,13 @@
 
       <div id="period-notice" class="period-notice hidden" role="status"></div>
 
-      <button type="submit" id="submit-btn">Book plass</button>
+      <div id="price-summary" class="price-summary hidden" aria-live="polite">
+        <p class="price-total"><strong>Pris for valgt periode: <span id="price-amount">–</span> kr</strong></p>
+        <p class="price-vipps">Betales med Vipps til <strong>908 12 444</strong>.</p>
+        <p class="price-commitment">Ved å trykke «Book plass» bekrefter du bestillingen og forplikter deg til å betale beløpet via Vipps.</p>
+      </div>
+
+      <button type="submit" id="submit-btn" disabled>Book plass</button>
     </form>
 
     <div id="message" class="message hidden" role="alert" aria-live="polite"></div>

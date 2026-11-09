@@ -6,11 +6,13 @@ const dateToDisplay = document.getElementById("booking_date_to_display");
 const hourFromSelect = document.getElementById("hour_from");
 const hourToSelect = document.getElementById("hour_to");
 const periodNotice = document.getElementById("period-notice");
+const priceSummary = document.getElementById("price-summary");
+const priceAmount = document.getElementById("price-amount");
 const messageEl = document.getElementById("message");
 const submitBtn = document.getElementById("submit-btn");
 
 const ALL_HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
-const MAX_BOOKING_HOURS = 96;
+const VIPPS_NUMBER = "908 12 444";
 
 let rangeCheck = null;
 
@@ -156,7 +158,34 @@ function hideMessage() {
   messageEl.classList.add("hidden");
 }
 
+function formatPrice(amount) {
+  return String(amount).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
+function showPriceSummary(priceKr) {
+  priceAmount.textContent = formatPrice(priceKr);
+  priceSummary.classList.remove("hidden");
+}
+
+function hidePriceSummary() {
+  priceSummary.classList.add("hidden");
+  priceAmount.textContent = "–";
+}
+
 function showConfirmation(booking) {
+  const vipps = booking.vipps_number || VIPPS_NUMBER;
+  const priceLabel =
+    booking.price_kr != null ? `${formatPrice(booking.price_kr)} kr` : "–";
+  const manageUrl = booking.manage_url || booking.manage_path || "";
+  const manageHtml = manageUrl
+    ? `<div class="confirmation-manage">
+        <strong>Administrer / forleng parkeringen:</strong>
+        <p class="confirmation-manage-link"><a href="${escapeHtml(manageUrl)}" id="manage-link">${escapeHtml(manageUrl)}</a></p>
+        <button type="button" id="copy-manage-link" class="copy-link-btn" data-url="${escapeHtml(manageUrl)}">Kopier lenke</button>
+        <p id="copy-manage-feedback" class="copy-link-feedback hidden" role="status">Lenken er kopiert!</p>
+        <p class="confirmation-manage-note">Husk å lagre lenken, slik at du enkelt kan administrere eller forlenge parkeringen senere 😊</p>
+      </div>`
+    : "";
   messageEl.innerHTML = `
     <p class="confirmation-title">Plassen er booket!</p>
     <ul class="confirmation-details">
@@ -172,10 +201,52 @@ function showConfirmation(booking) {
         )
       )}</li>
       <li><span>Timer</span> ${escapeHtml(String(booking.slot_count))} time(r)</li>
+      <li><span>Pris</span> ${escapeHtml(priceLabel)}</li>
+      <li><span>Vipps</span> ${escapeHtml(vipps)}</li>
     </ul>
+    <p class="confirmation-payment">Betales med Vipps til <strong>${escapeHtml(vipps)}</strong>.</p>
+    ${manageHtml}
   `;
   messageEl.className = "message success confirmation";
   revealMessage();
+
+  const copyBtn = document.getElementById("copy-manage-link");
+  const copyFeedback = document.getElementById("copy-manage-feedback");
+  if (copyBtn && manageUrl) {
+    copyBtn.addEventListener("click", async () => {
+      const url = copyBtn.getAttribute("data-url") || manageUrl;
+      try {
+        let copied = false;
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(url);
+          copied = true;
+        } else {
+          const ta = document.createElement("textarea");
+          ta.value = url;
+          ta.setAttribute("readonly", "");
+          ta.style.position = "absolute";
+          ta.style.left = "-9999px";
+          document.body.appendChild(ta);
+          ta.select();
+          copied = document.execCommand("copy");
+          document.body.removeChild(ta);
+        }
+        if (!copied) {
+          throw new Error("copy-failed");
+        }
+        if (copyFeedback) {
+          copyFeedback.textContent = "Lenken er kopiert!";
+          copyFeedback.classList.remove("hidden");
+        }
+      } catch {
+        if (copyFeedback) {
+          copyFeedback.textContent =
+            "Kunne ikke kopiere automatisk. Marker og kopier lenken manuelt.";
+          copyFeedback.classList.remove("hidden");
+        }
+      }
+    });
+  }
 }
 
 function hidePeriodNotice() {
@@ -183,44 +254,30 @@ function hidePeriodNotice() {
   periodNotice.innerHTML = "";
 }
 
-function updatePeriodNotice(bookedSlots, dateFrom, dateTo, slotCount) {
-  const overLimit = slotCount > MAX_BOOKING_HOURS;
-
-  if (!overLimit && !bookedSlots.length) {
+function updatePeriodNotice(occupiedPeriods, dateFrom, dateTo) {
+  if (!occupiedPeriods.length) {
     hidePeriodNotice();
     return;
   }
 
-  let html = "";
-  if (overLimit) {
-    html +=
-      '<p class="booking-limit">Plassen kan bookes maks fire dager (96 timer) om gangen.</p>';
-  }
+  const items = occupiedPeriods
+    .map(
+      (period) =>
+        `<li>${escapeHtml(period.period_label || formatPeriodLabel(period.start_date, period.start_hour, period.end_date, period.end_hour))}</li>`
+    )
+    .join("");
 
-  if (bookedSlots.length) {
-    const byDate = groupSlotsByDate(bookedSlots);
-    const dates = Object.keys(byDate).sort();
-    const items = dates
-      .map((date) => {
-        const hoursLabel = formatHoursList(byDate[date]);
-        return `<li><strong>${escapeHtml(formatDateNorwegian(date))}:</strong> ${escapeHtml(hoursLabel)}</li>`;
-      })
-      .join("");
+  const rangeLabel =
+    dateFrom === dateTo
+      ? formatDateNorwegian(dateFrom)
+      : `${formatDateNorwegian(dateFrom)} – ${formatDateNorwegian(dateTo)}`;
 
-    const rangeLabel =
-      dateFrom === dateTo
-        ? formatDateNorwegian(dateFrom)
-        : `${formatDateNorwegian(dateFrom)} – ${formatDateNorwegian(dateTo)}`;
-
-    html += `
-      <div class="${overLimit ? "booked-slots-section" : ""}">
-        <strong>Allerede booket ${escapeHtml(rangeLabel)} (${bookedSlots.length} timer):</strong>
-        <ul class="booked-slots-list">${items}</ul>
-      </div>
-    `;
-  }
-
-  periodNotice.innerHTML = html;
+  periodNotice.innerHTML = `
+    <div>
+      <strong>Allerede booket i/nær ${escapeHtml(rangeLabel)}:</strong>
+      <ul class="booked-slots-list">${items}</ul>
+    </div>
+  `;
   periodNotice.classList.remove("hidden");
 }
 
@@ -241,6 +298,7 @@ function resetHourSelects() {
   hourToSelect.disabled = true;
   rangeCheck = null;
   submitBtn.disabled = true;
+  hidePriceSummary();
 }
 
 function syncDateConstraints() {
@@ -262,12 +320,22 @@ async function checkRange() {
   if (!dateFrom || !dateTo || !hourFrom || !hourTo) {
     rangeCheck = null;
     submitBtn.disabled = true;
+    hidePriceSummary();
     return;
   }
 
   if (dateTo < dateFrom) {
     showMessage("Til-dato kan ikke være før fra-dato.", "error");
     submitBtn.disabled = true;
+    hidePriceSummary();
+    return;
+  }
+
+  if (dateTo === dateFrom && hourTo <= hourFrom) {
+    rangeCheck = null;
+    submitBtn.disabled = true;
+    hidePriceSummary();
+    showMessage("Sluttidspunkt må være etter start.", "error");
     return;
   }
 
@@ -287,16 +355,15 @@ async function checkRange() {
     rangeCheck = await res.json();
 
     updatePeriodNotice(
-      rangeCheck.booked_slots || [],
+      rangeCheck.occupied_periods || [],
       dateFrom,
-      dateTo,
-      rangeCheck.slot_count
+      dateTo
     );
 
-    if (rangeCheck.slot_count > MAX_BOOKING_HOURS) {
-      hideMessage();
-      submitBtn.disabled = true;
-      return;
+    if (typeof rangeCheck.price_kr === "number") {
+      showPriceSummary(rangeCheck.price_kr);
+    } else {
+      hidePriceSummary();
     }
 
     if (rangeCheck.available) {
@@ -309,6 +376,7 @@ async function checkRange() {
   } catch (err) {
     rangeCheck = null;
     submitBtn.disabled = true;
+    hidePriceSummary();
     showMessage(err.message || "Kunne ikke sjekke perioden.", "error");
   }
 }
@@ -399,6 +467,7 @@ form.addEventListener("submit", async (e) => {
       syncAllDateDisplays();
       resetHourSelects();
       hidePeriodNotice();
+      hidePriceSummary();
     } else if (res.status === 409) {
       showMessage(
         data.detail ||
