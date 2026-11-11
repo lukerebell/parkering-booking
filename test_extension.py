@@ -929,6 +929,81 @@ class AdminPaidStatusTests(unittest.TestCase):
         self.assertIn("admin-paid-toggle is-paid", page.text)
         self.assertIn("admin-paid-toggle is-unpaid", page.text)
 
+    def test_admin_copy_links_use_existing_tokens_and_are_unique(self):
+        from fastapi.testclient import TestClient
+        from starlette.requests import Request
+
+        first, _ = self._insert(50, 0)
+        with get_db() as conn:
+            conn.execute(
+                """
+                INSERT INTO reservations (
+                    manage_token, name, phone, car_reg,
+                    start_date, start_hour, end_date, end_hour,
+                    charged_total_kr, paid_total_kr,
+                    is_legacy, original_end_date, original_end_hour
+                ) VALUES (
+                    'second-manage-token', 'Bo', '87654321', 'XY98765',
+                    ?, '12', ?, '16', 50, 0, 0, ?, '16'
+                )
+                """,
+                (first["start_date"], first["end_date"], first["end_date"]),
+            )
+            conn.commit()
+
+            scope = {
+                "type": "http",
+                "asgi": {"version": "3.0"},
+                "http_version": "1.1",
+                "method": "GET",
+                "scheme": "https",
+                "path": "/admin",
+                "raw_path": b"/admin",
+                "query_string": b"",
+                "headers": [
+                    (b"host", b"parkering-booking.onrender.com"),
+                    (b"x-forwarded-proto", b"https"),
+                ],
+                "client": ("1.1.1.1", 123),
+                "server": ("parkering-booking.onrender.com", 443),
+            }
+            groups = list_booking_groups(conn, Request(scope))
+
+        urls = [g["manage_url"] for g in groups]
+        self.assertEqual(len(urls), 2)
+        self.assertEqual(len(set(urls)), 2)
+        self.assertTrue(
+            all(u.startswith("https://parkering-booking.onrender.com/forleng/") for u in urls)
+        )
+        self.assertTrue(any(u.endswith("/forleng/paid-token") for u in urls))
+        self.assertTrue(any(u.endswith("/forleng/second-manage-token") for u in urls))
+
+        client = TestClient(main.app)
+        anonymous = client.get("/admin")
+        self.assertEqual(anonymous.status_code, 200)
+        self.assertNotIn("/forleng/", anonymous.text)
+        self.assertNotIn("paid-token", anonymous.text)
+        self.assertNotIn("Kopier administrasjonslenke", anonymous.text)
+
+        login = client.post(
+            "/admin/login",
+            data={"password": "test-admin-secret"},
+            follow_redirects=False,
+        )
+        page = client.get("/admin", cookies=login.cookies)
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("Kopier administrasjonslenke", page.text)
+        self.assertIn('data-url="http://testserver/forleng/paid-token"', page.text)
+        self.assertIn(
+            'data-url="http://testserver/forleng/second-manage-token"', page.text
+        )
+        self.assertIn("/static/admin.js?v=", page.text)
+
+        opened = client.get("/forleng/paid-token")
+        self.assertEqual(opened.status_code, 200)
+        self.assertIn("Ada", opened.text)
+        self.assertIn("KJ12345", opened.text)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -83,11 +83,22 @@
                   </form>
                 </td>
                 <td>{{ group.created_at }}</td>
-                <td>
-                  <form method="post" action="/admin/delete" onsubmit="return confirm('Slette denne bookingen?');">
-                    <input type="hidden" name="reservation_id" value="{{ group.reservation_id }}">
-                    <button type="submit" class="admin-btn-danger">Slett</button>
-                  </form>
+                <td class="admin-actions">
+                  <div class="admin-action-stack">
+                    <button
+                      type="button"
+                      class="admin-btn-secondary admin-copy-link-btn"
+                      data-url="{{ group.manage_url }}"
+                    >Kopier administrasjonslenke</button>
+                    <p class="admin-copy-feedback copy-link-feedback hidden" role="status"></p>
+                    <p class="admin-manual-link hidden">
+                      <a class="admin-manage-link" href="{{ group.manage_url }}">{{ group.manage_url }}</a>
+                    </p>
+                    <form method="post" action="/admin/delete" onsubmit="return confirm('Slette denne bookingen?');">
+                      <input type="hidden" name="reservation_id" value="{{ group.reservation_id }}">
+                      <button type="submit" class="admin-btn-danger">Slett</button>
+                    </form>
+                  </div>
                 </td>
               </tr>
               {% endfor %}
@@ -99,5 +110,9 @@
       {% endif %}
     {% endif %}
   </main>
+
+  {% if logged_in %}
+  <script src="/static/admin.js?v={{ asset_version }}"></script>
+  {% endif %}
 </body>
 </html>

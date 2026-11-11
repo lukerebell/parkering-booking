@@ -30,7 +30,7 @@ LETTER_RE = re.compile(r"[a-zA-ZæøåÆØÅ]", re.UNICODE)
 CAR_REG_RE = re.compile(r"^[A-ZÆØÅ]{2}\d{5}$", re.UNICODE)
 ADMIN_COOKIE = "admin_session"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
-ASSET_VERSION = os.environ.get("APP_ASSET_VERSION", "14")
+ASSET_VERSION = os.environ.get("APP_ASSET_VERSION", "15")
 TZ_OSLO = ZoneInfo("Europe/Oslo")
 
 PRICE_PER_DAY = 50
@@ -516,11 +516,12 @@ def get_reservation_by_token(conn, token: str):
     ).fetchone()
 
 
-def list_booking_groups(conn) -> list[dict]:
+def list_booking_groups(conn, request: Request | None = None) -> list[dict]:
     rows = conn.execute(
         """
         SELECT
             id,
+            manage_token,
             name,
             phone,
             car_reg,
@@ -541,6 +542,8 @@ def list_booking_groups(conn) -> list[dict]:
         hours = hours_between(
             row["start_date"], row["start_hour"], row["end_date"], row["end_hour"]
         )
+        path = manage_path(row["manage_token"])
+        manage_url = absolute_public_url(request, path) if request else path
         groups.append(
             {
                 "name": row["name"],
@@ -552,6 +555,8 @@ def list_booking_groups(conn) -> list[dict]:
                 "paid_total_kr": row["paid_total_kr"],
                 "is_paid": reservation_is_fully_paid(row),
                 "created_at": row["created_at"],
+                "manage_path": path,
+                "manage_url": manage_url,
                 "period_label": format_period_label(
                     row["start_date"],
                     row["start_hour"],
@@ -1261,7 +1266,7 @@ async def admin_page(request: Request, message: str | None = None):
         )
 
     with get_db() as conn:
-        groups = list_booking_groups(conn)
+        groups = list_booking_groups(conn, request)
 
     slot_count = sum(group["slot_count"] for group in groups)
     return templates.TemplateResponse(
