@@ -30,7 +30,7 @@ LETTER_RE = re.compile(r"[a-zA-ZæøåÆØÅ]", re.UNICODE)
 CAR_REG_RE = re.compile(r"^[A-ZÆØÅ]{2}\d{5}$", re.UNICODE)
 ADMIN_COOKIE = "admin_session"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
-ASSET_VERSION = os.environ.get("APP_ASSET_VERSION", "15")
+ASSET_VERSION = os.environ.get("APP_ASSET_VERSION", "16")
 TZ_OSLO = ZoneInfo("Europe/Oslo")
 
 PRICE_PER_DAY = 50

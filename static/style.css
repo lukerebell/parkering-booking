@@ -458,6 +458,12 @@ select {
   }
 }
 
+/* Admin trenger bredere layout enn bookingskjemaet (420px). */
+.container.admin-page {
+  max-width: 1200px;
+  width: 100%;
+}
+
 .admin-page h1 {
   font-size: 1.25rem;
 }
@@ -549,10 +555,15 @@ select {
 
 .admin-table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  background: #fff;
 }
 
 .admin-table {
   width: 100%;
+  min-width: 980px;
   border-collapse: collapse;
   font-size: 0.8125rem;
 }
@@ -560,9 +571,16 @@ select {
 .admin-table th,
 .admin-table td {
   text-align: left;
-  padding: 0.65rem 0.5rem;
+  padding: 0.75rem 0.65rem;
   border-bottom: 1px solid #e5e5e5;
   vertical-align: top;
+  white-space: nowrap;
+}
+
+.admin-table td:nth-child(4),
+.admin-table th:nth-child(4) {
+  white-space: normal;
+  min-width: 12rem;
 }
 
 .admin-table th {
